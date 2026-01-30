@@ -1,0 +1,114 @@
+version: "3.8"
+
+# Docker Compose for VM deployment (Splunk A runs natively on the VM)
+# Use this file on the Ubuntu 22.04 VM where Splunk A is installed natively
+# Run with: docker compose -f docker-compose.vm.yml up -d
+
+networks:
+  edge_processor_net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+
+services:
+  # Splunk B - Final Destination Indexer
+  splunk_b:
+    image: splunk/splunk:10.2
+    platform: linux/amd64
+    container_name: splunk_b
+    hostname: splunk_b
+    environment:
+      - SPLUNK_START_ARGS=--accept-license
+      - SPLUNK_GENERAL_TERMS=--accept-sgt-current-at-splunk-com
+      - SPLUNK_PASSWORD=${SPLUNK_PASSWORD}
+      - SPLUNK_HEC_TOKEN=${SPLUNK_HEC_TOKEN}
+    ports:
+      - "8001:8000"   # Web UI
+      - "8090:8089"   # Management API
+      - "8188:8088"   # HEC receiver
+      - "9998:9997"   # S2S receiver
+    volumes:
+      - splunk_b_var:/opt/splunk/var
+      - splunk_b_etc:/opt/splunk/etc
+      - ./configs/splunk_b/default.yml:/tmp/defaults/default.yml:ro
+    networks:
+      edge_processor_net:
+        ipv4_address: 172.28.0.50
+    restart: unless-stopped
+
+  # Edge Processor - Ubuntu container running Edge Processor binary
+  # Connects to native Splunk A on the host via host.docker.internal or host IP
+  edge_processor:
+    image: ubuntu:22.04
+    platform: linux/amd64
+    container_name: edge_processor
+    hostname: edge_processor
+    extra_hosts:
+      - "splunk_a:host-gateway"
+    command: >
+      bash -c "apt-get update && apt-get install -y curl netcat-openbsd wget ca-certificates gnupg &&
+               mkdir -p /opt/edge_processor /var/log/edge_processor &&
+               echo 'Edge Processor container ready. Install binary manually.' &&
+               tail -f /dev/null"
+    ports:
+      - "10514:10514"   # Syslog input
+      - "18088:8088"    # HEC input
+      - "19997:9997"    # S2S input
+    volumes:
+      - edge_processor_data:/opt/edge_processor
+      - ./configs/edge_processor/install.sh:/opt/install.sh:ro
+    networks:
+      edge_processor_net:
+        ipv4_address: 172.28.0.20
+    restart: unless-stopped
+
+  # Ubuntu Test Container - Test data generator
+  ubuntu_test:
+    image: ubuntu:22.04
+    container_name: ubuntu_test
+    hostname: ubuntu_test
+    extra_hosts:
+      - "splunk_a:host-gateway"
+    command: >
+      bash -c "apt-get update && apt-get install -y curl netcat-openbsd jq &&
+               echo 'Ubuntu test container ready for sending test data.' &&
+               tail -f /dev/null"
+    volumes:
+      - ./scripts:/opt/scripts:ro
+    networks:
+      edge_processor_net:
+        ipv4_address: 172.28.0.30
+    depends_on:
+      - edge_processor
+    restart: unless-stopped
+
+  # Cribl Stream - Data pipeline
+  cribl:
+    image: cribl/cribl:latest
+    container_name: cribl
+    hostname: cribl
+    extra_hosts:
+      - "splunk_a:host-gateway"
+    environment:
+      - CRIBL_DIST_MODE=single
+    ports:
+      - "9000:9000"   # Web UI
+      - "8088:8088"   # HEC input (from Edge Processor)
+      - "9997:9997"   # S2S input
+      - "9514:9514"   # Syslog input
+    volumes:
+      - cribl_data:/opt/cribl/data
+    networks:
+      edge_processor_net:
+        ipv4_address: 172.28.0.40
+    depends_on:
+      - splunk_b
+    restart: unless-stopped
+
+volumes:
+  splunk_b_var:
+  splunk_b_etc:
+  edge_processor_data:
+  cribl_data:

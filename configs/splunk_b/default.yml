@@ -1,0 +1,35 @@
+---
+# Splunk B Configuration - Final Destination Indexer
+
+splunk:
+  hec:
+    enable: true
+    ssl: false
+    port: 8088
+    token: ${SPLUNK_HEC_TOKEN}
+
+  conf:
+    server:
+      general:
+        serverName: splunk_b
+
+    web:
+      settings:
+        enableSplunkWebSSL: false
+        httpport: 8000
+
+    inputs:
+      default:
+        host: splunk_b
+
+      # Enable S2S receiver on port 9997
+      splunktcp://9997:
+        disabled: false
+        connection_host: dns
+
+    indexes:
+      edge_processor_demo:
+        homePath: $SPLUNK_DB/edge_processor_demo/db
+        coldPath: $SPLUNK_DB/edge_processor_demo/colddb
+        thawedPath: $SPLUNK_DB/edge_processor_demo/thaweddb
+        maxTotalDataSizeMB: 512

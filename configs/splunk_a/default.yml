@@ -1,0 +1,17 @@
+---
+# Splunk A Configuration - Edge Processor Management Server
+
+splunk:
+  conf:
+    server:
+      general:
+        serverName: splunk_a
+
+    web:
+      settings:
+        enableSplunkWebSSL: false
+        httpport: 8000
+
+    inputs:
+      default:
+        host: splunk_a

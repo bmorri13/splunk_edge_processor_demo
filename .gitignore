@@ -1,0 +1,34 @@
+# Environment files with credentials
+.env
+
+# Claude Code configuration (user-specific)
+.claude/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*~
+
+# IDE files
+.idea/
+.vscode/
+*.sublime-*
+
+# Docker volumes (if local)
+data/
+
+# Splunk artifacts
+*.spl
+*.tgz
